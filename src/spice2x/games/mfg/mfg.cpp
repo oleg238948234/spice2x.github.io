@@ -14,6 +14,7 @@ namespace games::mfg {
     std::string MFG_INJECT_ARGS = "";
     std::string MFG_CABINET_TYPE = "HG";
     bool MFG_NO_IO = false;
+    bool MFG_NO_ICCA = false;
 
     static acioemu::ACIOHandle *acioHandle = nullptr;
     static std::wstring portName;
@@ -27,14 +28,33 @@ namespace games::mfg {
 
         SetEnvironmentVariableA("VFG_CABINET_TYPE", MFG_CABINET_TYPE.c_str());
 
-        // add card reader
-        portName = (MFG_CABINET_TYPE == "UKS") ? std::wstring(L"\\\\.\\COM1") : std::wstring(L"\\\\.\\COM3");
-        acioHandle = new acioemu::ACIOHandle(portName.c_str(), 1);
-        devicehook_init_trampoline();
-        devicehook_add(acioHandle);
-
         execexe::init();
-        execexe::init_port_hook(portName, acioHandle);
+        execexe::init_deferred([] () {
+            // add card reader
+            if (!MFG_NO_ICCA) {
+                portName = (MFG_CABINET_TYPE == "UKS") ? std::wstring(L"\\\\.\\COM1") : std::wstring(L"\\\\.\\COM3");
+                acioHandle = new acioemu::ACIOHandle(portName.c_str(), 1);
+                devicehook_init_trampoline();
+                devicehook_add(acioHandle);
+                execexe::init_port_hook(portName, acioHandle);
+            }
+
+            execexe::load_library("libaio.dll");
+            execexe::load_library("libaio-iob.dll");
+            execexe::load_library("libaio-iob_video.dll");
+            execexe::load_library("libaio-iob2_video.dll");
+            execexe::load_library("win10actlog.dll");
+
+            if (!MFG_NO_IO) {
+                // insert BI2* hooks
+                if (MFG_CABINET_TYPE == "UKS") {
+                    log_fatal("mfg", "UKS io is not supported");
+                } else {
+                    bi2a_hook_init();
+                }
+            }
+        });
+
 
         if (GRAPHICS_SHOW_CURSOR) {
             unity_utils::force_show_cursor(true);
@@ -45,25 +65,6 @@ namespace games::mfg {
                             GetCommandLineA(),
                             MFG_INJECT_ARGS,
                             unity_utils::get_unity_player_args()));
-    }
-
-    void MFGGame::post_attach() {
-        Game::post_attach();
-
-        execexe::load_library("libaio.dll");
-        execexe::load_library("libaio-iob.dll");
-        execexe::load_library("libaio-iob_video.dll");
-        execexe::load_library("libaio-iob2_video.dll");
-        execexe::load_library("win10actlog.dll");
-
-        if (!MFG_NO_IO) {
-            // insert BI2* hooks
-            if (MFG_CABINET_TYPE == "UKS") {
-                log_fatal("mfg", "UKS io is not supported");
-            } else {
-                bi2a_hook_init();
-            }
-        }
     }
 
     void MFGGame::detach() {

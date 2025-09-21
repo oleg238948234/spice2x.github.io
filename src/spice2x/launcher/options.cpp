@@ -1797,9 +1797,20 @@ static const std::vector<OptionDefinition> OPTION_DEFINITIONS = {
         },
     },
     {
+        // MFGNoIO
         .title = "MFG Disable IO Emulation",
         .name = "mfgnoio",
         .desc = "Disables BI2X hooks for MFG",
+        .type = OptionType::Bool,
+        .setting_name = "",
+        .game_name = "Mahjong Fight Girl",
+        .category = "Game Options (Advanced)"
+    },
+    {
+        // MFGNoICCA
+        .title = "MFG Disable ICCA Emulation",
+        .name = "mfgnoicca",
+        .desc = "Disables ICCA emulation for MFG",
         .type = OptionType::Bool,
         .setting_name = "",
         .game_name = "Mahjong Fight Girl",

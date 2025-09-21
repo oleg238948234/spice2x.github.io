@@ -203,6 +203,7 @@ namespace launcher {
             MFGArgs,
             MFGCabType,
             MFGNoIO,
+            MFGNoICCA,
             PCArgs,
             PCNoIO,
             PCKnobMode,

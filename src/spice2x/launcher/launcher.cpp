@@ -1106,6 +1106,9 @@ int main_implementation(int argc, char *argv[]) {
     if (options[launcher::Options::MFGNoIO].is_active()) {
         games::mfg::MFG_NO_IO = options[launcher::Options::MFGNoIO].value_bool();
     }
+    if (options[launcher::Options::MFGNoICCA].is_active()) {
+        games::mfg::MFG_NO_ICCA = options[launcher::Options::MFGNoICCA].value_bool();
+    }
     if (options[launcher::Options::PCArgs].is_active()) {
         games::pc::PC_INJECT_ARGS = options[launcher::Options::PCArgs].value_text();
     }
