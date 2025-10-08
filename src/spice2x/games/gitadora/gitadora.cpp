@@ -4,17 +4,44 @@
 
 #include "cfg/configurator.h"
 #include "hooks/graphics/graphics.h"
+#include "hooks/setupapihook.h"
 #include "util/cpuutils.h"
 #include "util/detour.h"
 #include "util/libutils.h"
 #include "util/logging.h"
 #include "util/sigscan.h"
+#include "extio.h"
+#include "bi2x_hook.h"
 
 namespace games::gitadora {
 
     // settings
     bool TWOCHANNEL = false;
     std::optional<unsigned int> CAB_TYPE = std::nullopt;
+
+    /*
+     * Prevent GitaDora from creating folders on F drive
+     */
+
+    static DWORD WINAPI GetLogicalDrives_hook() {
+        return GetLogicalDrives() | 0x20;
+    }
+
+    static UINT WINAPI GetDriveTypeA_hook(LPCSTR lpRootPathName) {
+        if (!strcmp(lpRootPathName, "F:\\")) {
+            return DRIVE_FIXED;
+        }
+
+        return GetDriveTypeA(lpRootPathName);
+    }
+
+    static BOOL WINAPI CreateDirectoryA_hook(LPCSTR lpPathName, LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
+        if (!strncmp(lpPathName, "F:/", 3)) {
+            return TRUE;
+        }
+
+        return CreateDirectoryA(lpPathName, lpSecurityAttributes);
+    }
 
     /*
      * GitaDora checks if the IP address has changed, and if it has it throws 5-1506-0000 like jubeat.
@@ -196,47 +223,83 @@ namespace games::gitadora {
         HMODULE system_module = libutils::try_module("libsystem.dll");
 
         // patches
-        detour::inline_hook((void *) eam_network_detected_ip_change, libutils::try_proc(
-                sharepj_module, "eam_network_detected_ip_change"));
-        detour::inline_hook((void *) eam_network_settings_conflict, libutils::try_proc(
-                sharepj_module, "eam_network_settings_conflict"));
-        detour::inline_hook((void *) bmsd2_set_windows_volume, libutils::try_proc(
-                bmsd2_module, "bmsd2_set_windows_volume"));
-        detour::inline_hook((void *) sys_code_get_cmdline, libutils::try_proc(
-                system_module, "sys_code_get_cmdline"));
-        detour::inline_hook((void *) sys_setting_get_param, libutils::try_proc(
-                system_module, "sys_setting_get_param"));
-        detour::inline_hook((void *) sys_setting_set_param, libutils::try_proc(
-                system_module, "sys_setting_set_param"));
-        detour::inline_hook((void *) sys_debug_dip_get_param, libutils::try_proc(
-                system_module, "sys_debug_dip_get_param"));
-        detour::inline_hook((void *) sys_debug_dip_set_param, libutils::try_proc(
-                system_module, "sys_debug_dip_set_param"));
+        if (sharepj_module) {
+            detour::inline_hook((void *) eam_network_detected_ip_change, libutils::try_proc(
+                    sharepj_module, "eam_network_detected_ip_change"));
+            detour::inline_hook((void *) eam_network_settings_conflict, libutils::try_proc(
+                    sharepj_module, "eam_network_settings_conflict"));
+        }
+
+        if (bmsd2_module) {
+            detour::inline_hook((void *) bmsd2_set_windows_volume, libutils::try_proc(
+                    bmsd2_module, "bmsd2_set_windows_volume"));
+        }
+
+        if (system_module) {
+            detour::inline_hook((void *) sys_code_get_cmdline, libutils::try_proc(
+                    system_module, "sys_code_get_cmdline"));
+            detour::inline_hook((void *) sys_setting_get_param, libutils::try_proc(
+                    system_module, "sys_setting_get_param"));
+            detour::inline_hook((void *) sys_setting_set_param, libutils::try_proc(
+                    system_module, "sys_setting_set_param"));
+            detour::inline_hook((void *) sys_debug_dip_get_param, libutils::try_proc(
+                    system_module, "sys_debug_dip_get_param"));
+            detour::inline_hook((void *) sys_debug_dip_set_param, libutils::try_proc(
+                    system_module, "sys_debug_dip_set_param"));
+        }
+
+        detour::iat_try("GetLogicalDrives", GetLogicalDrives_hook, avs::game::DLL_INSTANCE);
+        detour::iat_try("GetDriveTypeA", GetDriveTypeA_hook, avs::game::DLL_INSTANCE);
+        detour::iat_try("CreateDirectoryA", CreateDirectoryA_hook, avs::game::DLL_INSTANCE);
+
+        if (libutils::try_library("libaio.dll")) {
+            // add BIO2 I/O board
+            SETUPAPI_SETTINGS settings {};
+            settings.class_guid[0] = 0x86E0D1E0;
+            settings.class_guid[1] = 0x11D08089;
+            settings.class_guid[2] = 0x0008E49C;
+            settings.class_guid[3] = 0x731F303E;
+            const char property[] = "1CCF(8050)_000";
+            const char property_hardwareid[] = "USB\\VID_1CCF&PID_8050&MI_00\\000";
+            memcpy(settings.property_devicedesc, property, sizeof(property));
+            memcpy(settings.property_hardwareid, property_hardwareid, sizeof(property_hardwareid));
+            setupapihook_init(avs::game::DLL_INSTANCE);
+            setupapihook_add(settings);
+
+            bi2x_hook_init();
+
+            if (!libutils::try_library("libextio.dll")) {
+                // statically linked libextio, need to use emulation
+                devicehook_init(avs::game::DLL_INSTANCE);
+                devicehook_add(new GDExtIoHandle(L"COM1",ExtIoType::DETECT, 0));
+            }
+        }
 
 #ifdef SPICE64
 
         HMODULE gdme_module = libutils::try_module("libgdme.dll");
-
-        // window patch
-        if (GRAPHICS_WINDOWED && !replace_pattern(
-                gdme_module,
-                "754185ED753D8B4118BF0000CB02",
-                "9090????9090??????????????12", 0, 0))
-        {
-            log_warning("gitadora", "windowed mode failed");
+        if (gdme_module) {
+            // window patch
+            if (GRAPHICS_WINDOWED && !replace_pattern(
+                    gdme_module,
+                    "754185ED753D8B4118BF0000CB02",
+                    "9090????9090??????????????12", 0, 0)) {
+                log_warning("gitadora", "windowed mode failed");
+            }
         }
 
         HMODULE bmsd_engine_module = libutils::try_module("libbmsd-engine.dll");
         HMODULE bmsd_module = libutils::try_module("libbmsd.dll");
 
-        // two channel mod
-        if (TWOCHANNEL) {
-            bmsd2_boot_orig = detour::iat_try("bmsd2_boot", bmsd2_boot_hook, bmsd_module);
+        if (bmsd_engine_module && bmsd_module) {
+            // two channel mod
+            if (TWOCHANNEL) {
+                bmsd2_boot_orig = detour::iat_try("bmsd2_boot", bmsd2_boot_hook, bmsd_module);
 
-            if (!(replace_pattern(bmsd_engine_module, "33000000488D", "03??????????", 0, 0) ||
-                    replace_pattern(bmsd_engine_module, "330000000F10", "03??????????", 0, 0)))
-            {
-                log_warning("gitadora", "two channel mode failed");
+                if (!(replace_pattern(bmsd_engine_module, "33000000488D", "03??????????", 0, 0) ||
+                      replace_pattern(bmsd_engine_module, "330000000F10", "03??????????", 0, 0))) {
+                    log_warning("gitadora", "two channel mode failed");
+                }
             }
         }
 

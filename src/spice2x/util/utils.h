@@ -171,7 +171,7 @@ static inline std::string bin2hex(const std::vector<T> &data) {
 }
 
 template<typename T>
-static inline std::string bin2hex(const circular_buffer<T> &data) {
+static inline std::string bin2hex(circular_buffer<T> &data) {
     std::string str;
 
     str.reserve(data.size() * 2);

@@ -1329,6 +1329,13 @@ static const std::vector<OptionDefinition> OPTION_DEFINITIONS = {
         .category = "I/O Modules",
     },
     {
+        .title = "Enable AMI2000 Module",
+        .name = "ami2000",
+        .desc = "Manually enable AMI2000 emulation",
+        .type = OptionType::Bool,
+        .category = "I/O Modules",
+    },
+    {
         .title = "Enable device passthrough",
         .name = "devicehookdisable",
         .desc = "Disable I/O and serial device hooks",

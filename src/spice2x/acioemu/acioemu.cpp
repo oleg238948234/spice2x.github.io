@@ -207,3 +207,7 @@ void ACIOEmu::msg_parse() {
             bin2hex(*this->read_buffer));
 #endif
 }
+
+circular_buffer<uint8_t> &ACIOEmu::get_response_buffer() {
+    return *this->response_buffer;
+}

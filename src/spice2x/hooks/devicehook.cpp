@@ -386,6 +386,10 @@ static BOOL WINAPI ClearCommBreak_hook(HANDLE hFile) {
 static BOOL WINAPI ClearCommError_hook(HANDLE hFile, LPDWORD lpErrors, LPCOMSTAT lpStat) {
     auto *custom_handle = get_custom_handle(hFile);
     if (custom_handle && !custom_handle->com_pass) {
+        if (lpErrors) {
+            *lpErrors = 0;
+        }
+
         if (lpStat) {
             lpStat->fXoffSent = 1;
 

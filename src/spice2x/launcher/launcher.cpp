@@ -89,6 +89,7 @@
 #include "misc/eamuse.h"
 #include "misc/extdev.h"
 #include "misc/sciunit.h"
+#include "misc/ami2000.h"
 #include "misc/sde.h"
 #include "misc/wintouchemu.h"
 #include "overlay/overlay.h"
@@ -196,6 +197,7 @@ int main_implementation(int argc, char *argv[]) {
     bool attach_device = false;
     bool attach_extdev = false;
     bool attach_sciunit = false;
+    bool attach_ami2000 = false;
     bool attach_cpusbxpkm_printer = false;
     bool attach_iidx = false;
     bool attach_sdvx = false;
@@ -425,6 +427,9 @@ int main_implementation(int argc, char *argv[]) {
     }
     if (options[launcher::Options::EnableSCIUNITModule].value_bool()) {
         attach_sciunit = true;
+    }
+    if (options[launcher::Options::EnableAMI2000Module].value_bool()) {
+        attach_ami2000 = true;
     }
     if (options[launcher::Options::EnableDevicePassthrough].value_bool()) {
         hooks::device::ENABLE = false;
@@ -2199,6 +2204,11 @@ int main_implementation(int argc, char *argv[]) {
         sciunit_attach();
     }
 
+    // ami2000 attach
+    if (attach_io || attach_ami2000) {
+        ami2000_attach();
+    }
+
     // SDVX printer attach
     if (attach_cpusbxpkm_printer) {
         games::shared::printer_attach();
@@ -2323,6 +2333,11 @@ int main_implementation(int argc, char *argv[]) {
     // detach games
     for (auto game : games) {
         game->detach();
+    }
+
+    // sci unit detach
+    if (attach_io || attach_ami2000) {
+        ami2000_detach();
     }
 
     // sci unit detach

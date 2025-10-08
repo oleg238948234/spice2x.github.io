@@ -29,5 +29,7 @@ namespace acioemu {
         void write(uint8_t byte);
         std::optional<uint8_t> read();
         size_t bytes_available();
+
+        circular_buffer<uint8_t> &get_response_buffer();
     };
 }

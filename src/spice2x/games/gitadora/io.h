@@ -5,6 +5,9 @@
 
 namespace games::gitadora {
 
+    const auto GUITAR_NUM_BUTTONS = 22;
+    const auto GUITAR_NUM_ANALOGS = 4;
+
     // all buttons in correct order
     namespace Buttons {
         enum {
